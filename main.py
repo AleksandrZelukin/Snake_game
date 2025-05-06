@@ -1,118 +1,86 @@
-#A Game of Snake using Python - www.101computing.net/snake-game-using-python/
-import turtle
-import random
-import time
-from snake import Snake
-from apple import Apple
+import curses 
+from random import randint
 
-def displayInstructions():
-   print("~~~~~~~~~~~~~~~~~~~~")
-   print("~                  ~")
-   print("~   Snake Game     ~")
-   print("~                  ~")
-   print("~~~~~~~~~~~~~~~~~~~~")
-   print("")
-   print("~~~ Instructions ~~~")
-   print(" > Use the arrow keys on your keyboard to control the snake.")
-   print(" > Do not let your snake reach the edges of the screen.")
-   print(" > Direct your snake to reach the red apple.")
-   print(" > Do not let your snake eat/cross its own tail.")
-   print("~~~~~~~~~~~~~~~~~~~~")
-   print("")
-   print(" >>> Double click on the screen to get started...")
-   print("")
+#constants
 
-def drawBorders():
-   pen = turtle.Turtle()
-   pen.hideturtle()  
-   pen.speed(5)
-   pen.color("#FFFFFF")
-   pen.pensize(2)
-   pen.penup()
-   pen.goto(-199,-199)
-   pen.pendown()
-   for i in range(4):
-      pen.forward(398)
-      pen.left(90)
+WINDOW_WIDTH = 60  # number of columns of window box 
+WINDOW_HEIGHT = 20 # number of rows of window box 
+'''
+Number of blocks in window per line = WINDOW_WIDTH -2. 
+Block x index ranges from 1 to WINDOW_WIDTH -2.
+Number of blocks in window per column = WINDOW_HEIGHT -2. 
+Block y index ranges from 1 to WINDOW_HEIGHT -2.
+'''
 
-# >>> Setup the Stage
-screen = turtle.Screen()
-screen.tracer(0,0)
-screen.setup(400, 400)
-# screen.bgcolor("200,200,200")
+# setup window
+curses.initscr()
+win = curses.newwin(WINDOW_HEIGHT, WINDOW_WIDTH, 0, 0) # rows, columns
+win.keypad(1)
+curses.noecho()
+curses.curs_set(0)
+win.border(0)
+win.nodelay(1) # -1
 
-# >>> Draw the white borders
-drawBorders()
-  
-# >>> Add the apple
-apple = Apple("#FF0000",random.randint(0,19),random.randint(0,19))
-apple.draw()
+# snake and food
+snake = [(4, 4), (4, 3), (4, 2)]
+food = (6, 6)
 
-# >>> Add the Snake...
-snake = Snake("#810081","#B130B1",0,19)  #Purple Snake in the bottom left corner (0,0) of the 20x20 grid
-snake.direction = "right"
-snake.draw()
+win.addch(food[0], food[1], '#')
+# game logic
+score = 0
 
-# >>> Display instructions on how to play the game
-displayInstructions()
+ESC = 27
+key = curses.KEY_RIGHT
 
-def startGame(x,y):
-   global gameOver
-   if not gameOver:
-      score = 0
-      delay = 0.25
-      print(" >>> Starting Game")
-    
-      # >>> Main game loop
-      while not gameOver:  
-         screen.bgcolor((200,200,200))
-         snake.move() 
-  
-         # Has the snake gone over the edge of the game window?
-         if snake.isOffScreen():
-            print(" >>> Game Over! <<<")
-            gameOver=True
-        
-         #Is the snake biting its own tail!  
-         elif snake.isBitingTail():
-            print(" >>> Game Over! <<<")
-            gameOver=True
-        
-         # Has the snake reached the apple? 
-         elif snake.position[0] == apple.position[0] and snake.position[1] == apple.position[1]:
-            snake.score += 1
-            print("Score: " + str(snake.score) + "pts")
-            # Extend the tail of the snake
-            snake.grow()
-            # Respawn the apple using a different location
-            apple.respawn()
-   
-         screen.update()
-         time.sleep(delay)
+while key != ESC:
+    win.addstr(0, 2, 'Score ' + str(score) + ' ')
+    win.timeout(150 - (len(snake)) // 5 + len(snake)//10 % 120) # increase speed
 
+    prev_key = key
+    event = win.getch()
+    key = event if event != -1 else prev_key
 
-# >>> Implementing motion of the snake in all 4 directions
-def go_up():
-   snake.direction = "up"
+    if key not in [curses.KEY_LEFT, curses.KEY_RIGHT, curses.KEY_UP, curses.KEY_DOWN, ESC]:
+        key = prev_key
 
-def go_down():
-   snake.direction = "down"
-  
-def go_right():
-   snake.direction = "right"
- 
-def go_left():
-   snake.direction = "left"
+    # calculate the next coordinates
+    y = snake[0][0]
+    x = snake[0][1]
+    if key == curses.KEY_DOWN:
+        y += 1
+    if key == curses.KEY_UP:
+        y -= 1
+    if key == curses.KEY_LEFT:
+        x -= 1
+    if key == curses.KEY_RIGHT:
+        x += 1
 
-# >>> Keyboard bindings (using the arrow keys)
-screen.listen()
-screen.onkey(go_up, "Up")
-screen.onkey(go_down, "Down")
-screen.onkey(go_right, "Right")
-screen.onkey(go_left, "Left")
+    snake.insert(0, (y, x)) # append O(n)
 
-#The game will only start once the player clicks on the screen
-screen.onscreenclick(startGame, 1)
+    # check if we hit the border
+    if y == 0: break
+    if y == WINDOW_HEIGHT-1: break
+    if x == 0: break
+    if x == WINDOW_WIDTH -1: break
 
-gameOver=False
-screen.mainloop()
+    # if snake runs over itself
+    if snake[0] in snake[1:]: break
+
+    if snake[0] == food:
+        # eat the food
+        score += 1
+        food = ()
+        while food == ():
+            food = (randint(1,WINDOW_HEIGHT-2), randint(1,WINDOW_WIDTH -2))
+            if food in snake:
+                food = ()
+        win.addch(food[0], food[1], '#')
+    else:
+        # move snake
+        last = snake.pop()
+        win.addch(last[0], last[1], ' ')
+
+    win.addch(snake[0][0], snake[0][1], '*')
+
+curses.endwin()
+print(f"Final score = {score}")
